@@ -21,10 +21,8 @@ from langchain.chains.question_answering import load_qa_chain
 
 #Menu de lado y horizontal
 with st.sidebar:
-    selected = option_menu(None, ["Chat Box", "Internal Chat", "Mail + Invoice Automation", 'Settings'], 
-    icons=['house', 'chat', "envelope", 'gear'], 
-    menu_icon="cast", default_index=0, orientation="horizontal")
-selected
+    st.link_button("Check out the repo!", "https://github.com/camilardgzm/chatbox")
+   
 selected2 = option_menu(None, ["Home", "Internal Chat", "Mail + Invoice Automation", 'Settings'], 
     icons=['house', 'chat', "envelope", 'gear'], 
     menu_icon="cast", default_index=0, orientation="horizontal")
@@ -45,46 +43,50 @@ if LOGGED_IN == True:
     def main():
         load_dotenv()
         st.header("Chat with Internal Docuemnts")
-        st.write("Training Personal")
-        #Subir Pdfs
+
+# Primer paso: lectura de pdfs
+ #Subir Pdfs
         pdf = st.file_uploader("Upload your PDF", type="pdf")
         
         if pdf is not None:
             st.write(pdf.name)
             pdfReader = PdfReader(pdf)
-            #st.write(pdfReader)
+
             text = ""
             for page in pdfReader.pages:
                 text += page.extract_text()
-            
+# Utilizamos texto como fragmentos 
+# Nos permite manejar grandes cantidades de info
+# Ayuda a las limitaciones de tokens por parte de OpenAI API
             textSplitter = RecursiveCharacterTextSplitter(
                 chunk_size = 1000,
                 chunk_overlap = 200, #overlap between chunks  
                 length_function  = len
                 )
             chunks = textSplitter.split_text(text=text)
-            
+# Segundo paso: conversión de chunks a alimento para LLM de forma numérica
 
+# Embedings: vector representation of words used to transform text
+# into numerical format that can be processed by a LLM
 
-
-
-            #embedings
-            storeName = pdf.name[:-4]
-
-    # Reads file from storage, es decir ya se habia cargado este pdf antes 
+ 
+            storeName = pdf.name[:-4] # Se guarda el nombre del pdf para los embeddings
+            # Reads file from storage, es decir ya se habia cargado este pdf antes
             if os.path.exists(f"{storeName}.pkl"):
                 with open(f"{storeName}.pkl", "rb") as f:
                     VectorStore = pickle.load(f)
                 st.write("Embeddings Loaded from disk ")
             else:# si nunca se habi adetectado ese pdf, cargamos los embeddings
-                embeddings = OpenAIEmbeddings()
+                embeddings = OpenAIEmbeddings() #Procesamos la conversion de chunks a represenatciones numericas
                 VectorStore = FAISS.from_texts(chunks, embedding=embeddings)
                 with open(f"{storeName}.pkl","wb") as f:
                     pickle.dump(VectorStore,f)
                 st.write("Embeding computation completed")
+# Tercer paso: prompt del usario como query 
     # User input prompts
             query = st.text_input("Ask me something about the doc")
             st.write(query)
+# Cuarto paso: busqueda semantica con respecto al query, las coincidencias semanticas se alimentan al modelo para ser procesadas
     # Perform semantic search, top 3 chunks more similar 
             if query:
                 docs = VectorStore.similarity_search(query=query, k = 3)
